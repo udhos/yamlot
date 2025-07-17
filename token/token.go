@@ -160,7 +160,6 @@ NEXT_RUNE:
 		switch t.status {
 
 		case statusBlank:
-
 			switch ch {
 			case '\n':
 				return t.returnNewLine()
@@ -168,66 +167,11 @@ NEXT_RUNE:
 				// Only match dash if it's at the beginning of a line
 				if t.column == 1 {
 					t.status = statusOneDash
-
-					/*
-						ch, _, err := t.reader.ReadRune()
-						if err == io.EOF {
-							return t.returnDash()
-						}
-					*/
-
-					/*
-						if ch == '-' {
-							// hit --, check for ---
-							ch, _, err := t.reader.ReadRune()
-							if err == io.EOF {
-								return Token{
-									Type:   TokenPlainScalar,
-									Value:  "--",
-									Line:   t.line,
-									Column: t.column - 2,
-								}, nil
-							}
-							if err != nil {
-								t.reader.UnreadRune()
-							} else {
-								if ch == '-' {
-									return Token{Type: TokenDocStart, Value: "---", Line: t.line, Column: t.column}, nil
-								}
-							}
-						}
-					*/
-
-					/*
-						if ch == ' ' || ch == '\n' {
-							return t.unreadAndReturnDash()
-						}
-						if err := t.reader.UnreadRune(); err != nil {
-							return Token{}, err
-						}
-
-						//t.status = statusBlank
-
-						//var scalar []rune
-						scalar := []rune{'-'}
-
-						return t.collectPlainScalar(scalar)
-					*/
-
 					continue NEXT_RUNE
 				}
 			}
-
 			return t.collectPlainScalar(nil)
 
-			/*
-						Token{
-					Type:   TokenPlainScalar,
-					Value:  strings.TrimSpace(value),
-					Line:   t.line,
-					Column: t.column - len(value),
-				}, nil
-			*/
 		case statusOneDash:
 			switch ch {
 			case ' ':
@@ -240,7 +184,6 @@ NEXT_RUNE:
 				t.status = statusTwoDashes
 				continue NEXT_RUNE
 			}
-
 			t.status = statusBlank
 			return t.collectPlainScalar([]rune{'-', ch})
 
@@ -269,7 +212,6 @@ NEXT_RUNE:
 				t.status = statusThreeDashes
 				continue NEXT_RUNE
 			}
-
 			t.status = statusBlank
 			return t.collectPlainScalar([]rune{'-', '-', ch})
 
@@ -298,15 +240,12 @@ NEXT_RUNE:
 					Column: t.column - 3,
 				}, nil
 			}
-
 			t.status = statusBlank
 			return t.collectPlainScalar([]rune{'-', '-', '-', ch})
 
 		case statusAfterDash:
 			t.status = statusBlank
-
 			var scalar []rune
-
 			// skip blanks
 			for {
 				if ch == '\n' {
@@ -327,9 +266,6 @@ NEXT_RUNE:
 
 				t.column++
 			}
-
-			// collect plain scalar
-
 			return t.collectPlainScalar(scalar)
 
 		default:
