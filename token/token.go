@@ -62,6 +62,15 @@ func (t *Tokenizer) returnDash() (Token, error) {
 	return tk, nil
 }
 
+func (t *Tokenizer) returnDocStart() (Token, error) {
+	return Token{
+		Type:   TokenDocStart,
+		Value:  "---",
+		Line:   t.line,
+		Column: t.column - 3,
+	}, nil
+}
+
 func (t *Tokenizer) unreadAndReturnDash() (Token, error) {
 	if err := t.reader.UnreadRune(); err != nil {
 		return Token{}, err
@@ -121,12 +130,7 @@ func (t *Tokenizer) perStateEOF() (Token, error) {
 		}, nil
 	case statusThreeDashes:
 		t.eof = true // force EOF
-		return Token{
-			Type:   TokenDocStart,
-			Value:  "--",
-			Line:   t.line,
-			Column: t.column - 3,
-		}, nil
+		return t.returnDocStart()
 	}
 
 	return t.returnEOF()
@@ -222,23 +226,13 @@ NEXT_RUNE:
 				if err := t.reader.UnreadRune(); err != nil {
 					return Token{}, err
 				}
-				return Token{
-					Type:   TokenDocStart,
-					Value:  "---",
-					Line:   t.line,
-					Column: t.column - 3,
-				}, nil
+				return t.returnDocStart()
 			case '\n':
 				t.status = statusBlank
 				if err := t.reader.UnreadRune(); err != nil {
 					return Token{}, err
 				}
-				return Token{
-					Type:   TokenDocStart,
-					Value:  "---",
-					Line:   t.line,
-					Column: t.column - 3,
-				}, nil
+				return t.returnDocStart()
 			}
 			t.status = statusBlank
 			return t.collectPlainScalar([]rune{'-', '-', '-', ch})
