@@ -100,6 +100,11 @@ var tokenizerTestTable = []tokenizerTest{
 	{"isolated-dash-newline", "-\n", []Token{
 		{Type: TokenDash, Line: 1, Column: 1}, {Type: TokenNewLine},
 	}},
+	{"empty-scalar-after-dash", "- \n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
 	{"dash-followed-by-text-newline", "-a\n", []Token{
 		{Type: TokenPlainScalar, Value: "-a", Line: 1, Column: 1}, {Type: TokenNewLine},
 	}},
