@@ -120,7 +120,7 @@ func (t *Tokenizer) perStateEOF() (Token, error) {
 
 	switch t.status {
 	case statusOneDash:
-		t.eof = true // force EOF
+		t.eof = true // force EOF for next call, although we are not returning EOF now
 		return Token{
 			Type:   TokenDash,
 			Value:  "-",
@@ -128,7 +128,7 @@ func (t *Tokenizer) perStateEOF() (Token, error) {
 			Column: t.column - 1,
 		}, nil
 	case statusTwoDashes:
-		t.eof = true // force EOF
+		t.eof = true // force EOF for next call, although we are not returning EOF now
 		return Token{
 			Type:   TokenPlainScalar,
 			Value:  "--",
@@ -136,7 +136,7 @@ func (t *Tokenizer) perStateEOF() (Token, error) {
 			Column: t.column - 2,
 		}, nil
 	case statusThreeDashes:
-		t.eof = true // force EOF
+		t.eof = true // force EOF for next call, although we are not returning EOF now
 		return t.returnDocStart()
 	}
 
