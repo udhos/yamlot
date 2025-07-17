@@ -76,6 +76,13 @@ var tokenizerTestTable = []tokenizerTest{
 	{"double-dash-scalar-only", "--", []Token{
 		{Type: TokenPlainScalar, Value: "--", Line: 1, Column: 1},
 	}},
+	{"double-dash-followed-by-text", "--a", []Token{
+		{Type: TokenPlainScalar, Value: "--a", Line: 1, Column: 1},
+	}},
+	{"double-dash-followed-by-text-newline", "--a\n", []Token{
+		{Type: TokenPlainScalar, Value: "--a", Line: 1, Column: 1},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
 	{"isolated-dash", "-", []Token{
 		{Type: TokenDash, Line: 1, Column: 1},
 	}},

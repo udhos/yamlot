@@ -14,17 +14,24 @@ type Tokenizer struct {
 	line   int
 	column int
 	status tokenStatus
+	eof    bool // force EOF
 }
 
 type tokenStatus int
 
 const (
 	statusBlank tokenStatus = iota
+	statusOneDash
+	statusTwoDashes
+	statusThreeDashes
 	statusAfterDash
 )
 
 var statusName = []string{
 	"StatusBlank",
+	"StatusOneDash",
+	"StatusTwoDashes",
+	"StatusThreeDashes",
 	"StatusAfterDash",
 }
 
@@ -93,9 +100,47 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 	}, nil
 }
 
+func (t *Tokenizer) perStateEOF() (Token, error) {
+
+	switch t.status {
+	case statusOneDash:
+		t.eof = true // force EOF
+		return Token{
+			Type:   TokenDash,
+			Value:  "-",
+			Line:   t.line,
+			Column: t.column - 1,
+		}, nil
+	case statusTwoDashes:
+		t.eof = true // force EOF
+		return Token{
+			Type:   TokenPlainScalar,
+			Value:  "--",
+			Line:   t.line,
+			Column: t.column - 2,
+		}, nil
+	case statusThreeDashes:
+		t.eof = true // force EOF
+		return Token{
+			Type:   TokenDocStart,
+			Value:  "--",
+			Line:   t.line,
+			Column: t.column - 3,
+		}, nil
+	}
+
+	return t.returnEOF()
+}
+
 // NextToken gets next token.
 func (t *Tokenizer) NextToken() (Token, error) {
+NEXT_RUNE:
 	for {
+		if t.eof {
+			// force EOF
+			return t.returnEOF()
+		}
+
 		ch, _, err := t.reader.ReadRune()
 
 		const debug = false
@@ -104,7 +149,7 @@ func (t *Tokenizer) NextToken() (Token, error) {
 		}
 
 		if err == io.EOF {
-			return t.returnEOF()
+			return t.perStateEOF()
 		}
 		if err != nil {
 			return Token{}, err
@@ -122,10 +167,14 @@ func (t *Tokenizer) NextToken() (Token, error) {
 			case '-':
 				// Only match dash if it's at the beginning of a line
 				if t.column == 1 {
-					ch, _, err := t.reader.ReadRune()
-					if err == io.EOF {
-						return t.returnDash()
-					}
+					t.status = statusOneDash
+
+					/*
+						ch, _, err := t.reader.ReadRune()
+						if err == io.EOF {
+							return t.returnDash()
+						}
+					*/
 
 					/*
 						if ch == '-' {
@@ -149,21 +198,109 @@ func (t *Tokenizer) NextToken() (Token, error) {
 						}
 					*/
 
-					if ch == ' ' || ch == '\n' {
-						return t.unreadAndReturnDash()
-					}
-					if err := t.reader.UnreadRune(); err != nil {
-						return Token{}, err
-					}
+					/*
+						if ch == ' ' || ch == '\n' {
+							return t.unreadAndReturnDash()
+						}
+						if err := t.reader.UnreadRune(); err != nil {
+							return Token{}, err
+						}
 
-					//t.status = statusBlank
+						//t.status = statusBlank
 
-					//var scalar []rune
-					scalar := []rune{'-'}
+						//var scalar []rune
+						scalar := []rune{'-'}
 
-					return t.collectPlainScalar(scalar)
+						return t.collectPlainScalar(scalar)
+					*/
+
+					continue NEXT_RUNE
 				}
 			}
+
+			return t.collectPlainScalar(nil)
+
+			/*
+						Token{
+					Type:   TokenPlainScalar,
+					Value:  strings.TrimSpace(value),
+					Line:   t.line,
+					Column: t.column - len(value),
+				}, nil
+			*/
+		case statusOneDash:
+			switch ch {
+			case ' ':
+				t.status = statusAfterDash
+				return t.returnDash()
+			case '\n':
+				t.status = statusBlank
+				return t.unreadAndReturnDash()
+			case '-':
+				t.status = statusTwoDashes
+				continue NEXT_RUNE
+			}
+
+			t.status = statusBlank
+			return t.collectPlainScalar([]rune{'-', ch})
+
+		case statusTwoDashes:
+			switch ch {
+			case ' ':
+				t.status = statusBlank
+				return Token{
+					Type:   TokenPlainScalar,
+					Value:  "--",
+					Line:   t.line,
+					Column: t.column - 2,
+				}, nil
+			case '\n':
+				t.status = statusBlank
+				if err := t.reader.UnreadRune(); err != nil {
+					return Token{}, err
+				}
+				return Token{
+					Type:   TokenPlainScalar,
+					Value:  "--",
+					Line:   t.line,
+					Column: t.column - 2,
+				}, nil
+			case '-':
+				t.status = statusThreeDashes
+				continue NEXT_RUNE
+			}
+
+			t.status = statusBlank
+			return t.collectPlainScalar([]rune{'-', '-', ch})
+
+		case statusThreeDashes:
+			switch ch {
+			case ' ':
+				t.status = statusBlank
+				if err := t.reader.UnreadRune(); err != nil {
+					return Token{}, err
+				}
+				return Token{
+					Type:   TokenDocStart,
+					Value:  "---",
+					Line:   t.line,
+					Column: t.column - 3,
+				}, nil
+			case '\n':
+				t.status = statusBlank
+				if err := t.reader.UnreadRune(); err != nil {
+					return Token{}, err
+				}
+				return Token{
+					Type:   TokenDocStart,
+					Value:  "---",
+					Line:   t.line,
+					Column: t.column - 3,
+				}, nil
+			}
+
+			t.status = statusBlank
+			return t.collectPlainScalar([]rune{'-', '-', '-', ch})
 
 		case statusAfterDash:
 			t.status = statusBlank
