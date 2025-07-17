@@ -105,6 +105,11 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 3},
 		{Type: TokenNewLine, Line: 1, Column: 4},
 	}},
+	{"empty-scalar-two-spaces", "-  \n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 4},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
 	{"dash-followed-by-text-newline", "-a\n", []Token{
 		{Type: TokenPlainScalar, Value: "-a", Line: 1, Column: 1}, {Type: TokenNewLine},
 	}},
