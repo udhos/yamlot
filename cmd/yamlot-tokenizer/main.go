@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	tokenizer := token.NewTokenizer(os.Stdin)
+	const debug = false // set to true to enable debug output
+	tokenizer := token.NewTokenizer(os.Stdin, debug)
 	for {
 		t, err := tokenizer.NextToken()
 		if err == io.EOF && t.Type == token.TokenEOF {

@@ -15,6 +15,7 @@ type Tokenizer struct {
 	column int
 	status tokenStatus
 	eof    bool // force EOF
+	debug  bool
 }
 
 type tokenStatus int
@@ -36,12 +37,13 @@ var statusName = []string{
 }
 
 // NewTokenizer creates tokenizer.
-func NewTokenizer(input io.Reader) *Tokenizer {
+func NewTokenizer(input io.Reader, debug bool) *Tokenizer {
 	return &Tokenizer{
 		reader: bufio.NewReader(input),
 		line:   1,
 		column: 0,
 		status: statusBlank,
+		debug:  debug,
 	}
 }
 
@@ -101,12 +103,17 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 	}
 
 	value := string(scalar)
+
 	return Token{
 		Type:   TokenPlainScalar,
-		Value:  strings.TrimSpace(value),
+		Value:  trimSpace(value),
 		Line:   t.line,
 		Column: t.column - len(value),
 	}, nil
+}
+
+func trimSpace(s string) string {
+	return strings.TrimFunc(s, func(r rune) bool { return r == ' ' })
 }
 
 func (t *Tokenizer) perStateEOF() (Token, error) {
@@ -147,8 +154,7 @@ NEXT_RUNE:
 
 		ch, _, err := t.reader.ReadRune()
 
-		const debug = false
-		if debug {
+		if t.debug {
 			fmt.Printf("%s: Read rune: %d, err: %v\n", statusName[t.status], ch, err)
 		}
 
@@ -174,13 +180,16 @@ NEXT_RUNE:
 					continue NEXT_RUNE
 				}
 			}
-			return t.collectPlainScalar(nil)
+			return t.collectPlainScalar([]rune{ch})
 
 		case statusOneDash:
 			switch ch {
 			case ' ':
 				t.status = statusAfterDash
 				return t.returnDash()
+			case '\t':
+				t.status = statusAfterDash
+				return t.unreadAndReturnDash()
 			case '\n':
 				t.status = statusBlank
 				return t.unreadAndReturnDash()
@@ -245,7 +254,7 @@ NEXT_RUNE:
 				if ch == '\n' {
 					return t.returnNewLine()
 				}
-				if ch != ' ' && ch != '\t' {
+				if ch != ' ' {
 					scalar = append(scalar, ch)
 					break
 				}
@@ -313,7 +322,7 @@ type Token struct {
 
 func (t *Token) String() string {
 	if t.Type == TokenPlainScalar {
-		return tokenTypeName[t.Type] + "(" + t.Value + ")"
+		return fmt.Sprintf("%s(%s)", tokenTypeName[t.Type], t.Value)
 	}
-	return tokenTypeName[t.Type] + "()"
+	return fmt.Sprintf("%s()", tokenTypeName[t.Type])
 }

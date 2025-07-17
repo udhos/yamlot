@@ -3,13 +3,18 @@ package token
 import (
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 )
 
+func isDebugEnabled() bool {
+	return strings.HasPrefix(strings.ToLower(os.Getenv("DEBUG")), "t")
+}
+
 func TestTokenizerEmpty(t *testing.T) {
-	tokenizer := NewTokenizer(strings.NewReader(""))
+	tokenizer := NewTokenizer(strings.NewReader(""), isDebugEnabled())
 	expectEOF(t, tokenizer)
 }
 
@@ -24,7 +29,7 @@ func expectEOF(t *testing.T, tokenizer *Tokenizer) {
 }
 
 func TestTokenizerLines(t *testing.T) {
-	tokenizer := NewTokenizer(strings.NewReader("\n\n"))
+	tokenizer := NewTokenizer(strings.NewReader("\n\n"), isDebugEnabled())
 	{
 		tk, err := tokenizer.NextToken()
 		if err != nil {
@@ -110,6 +115,11 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenPlainScalar, Value: "hello", Line: 1, Column: 5},
 		{Type: TokenNewLine, Line: 1, Column: 10},
 	}},
+	{"doc-start-with-scalar-two-spaces", "---  hello\n", []Token{
+		{Type: TokenDocStart, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "hello", Line: 1, Column: 5},
+		{Type: TokenNewLine, Line: 1, Column: 10},
+	}},
 	{"false-doc-start-four-dashes", "----", []Token{
 		{Type: TokenPlainScalar, Value: "----", Line: 1, Column: 1},
 	}},
@@ -119,6 +129,11 @@ var tokenizerTestTable = []tokenizerTest{
 	{"false-doc-start-inline", "---value", []Token{
 		{Type: TokenPlainScalar, Value: "---value", Line: 1, Column: 1},
 	}},
+	{"scalar-with-tab", "-\tvalue\n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "\tvalue", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 9},
+	}},
 }
 
 // go test -count 1 -run '^TestTokenizer$' ./...
@@ -127,7 +142,7 @@ func TestTokenizer(t *testing.T) {
 		name := fmt.Sprintf("%02d of %02d: %s", i+1, len(tokenizerTestTable), data.name)
 
 		t.Run(name, func(t *testing.T) {
-			tokenizer := NewTokenizer(strings.NewReader(data.input))
+			tokenizer := NewTokenizer(strings.NewReader(data.input), isDebugEnabled())
 			var tokens []Token
 			for {
 				tk, err := tokenizer.NextToken()
