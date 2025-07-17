@@ -23,6 +23,11 @@ const (
 	statusAfterDash
 )
 
+var statusName = []string{
+	"StatusBlank",
+	"StatusAfterDash",
+}
+
 // NewTokenizer creates tokenizer.
 func NewTokenizer(input io.Reader) *Tokenizer {
 	return &Tokenizer{
@@ -45,18 +50,59 @@ func (t *Tokenizer) returnNewLine() (Token, error) {
 }
 
 func (t *Tokenizer) returnDash() (Token, error) {
-	if err := t.reader.UnreadRune(); err != nil {
-		return Token{}, err
-	}
 	tk := Token{Type: TokenDash, Value: "-", Line: t.line, Column: t.column}
 	t.status = statusAfterDash
 	return tk, nil
+}
+
+func (t *Tokenizer) unreadAndReturnDash() (Token, error) {
+	if err := t.reader.UnreadRune(); err != nil {
+		return Token{}, err
+	}
+	return t.returnDash()
+}
+
+func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
+
+	for {
+		peek, err := t.reader.Peek(1)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return Token{}, err
+		}
+
+		if peek[0] == '\n' || peek[0] == '#' {
+			break
+		}
+		ch, _, err := t.reader.ReadRune()
+		if err != nil {
+			return Token{}, err
+		}
+		scalar = append(scalar, ch)
+		t.column++
+	}
+
+	value := string(scalar)
+	return Token{
+		Type:   TokenPlainScalar,
+		Value:  strings.TrimSpace(value),
+		Line:   t.line,
+		Column: t.column - len(value),
+	}, nil
 }
 
 // NextToken gets next token.
 func (t *Tokenizer) NextToken() (Token, error) {
 	for {
 		ch, _, err := t.reader.ReadRune()
+
+		const debug = false
+		if debug {
+			fmt.Printf("%s: Read rune: %d, err: %v\n", statusName[t.status], ch, err)
+		}
+
 		if err == io.EOF {
 			return t.returnEOF()
 		}
@@ -76,7 +122,46 @@ func (t *Tokenizer) NextToken() (Token, error) {
 			case '-':
 				// Only match dash if it's at the beginning of a line
 				if t.column == 1 {
-					return t.returnDash()
+					ch, _, err := t.reader.ReadRune()
+					if err == io.EOF {
+						return t.returnDash()
+					}
+
+					/*
+						if ch == '-' {
+							// hit --, check for ---
+							ch, _, err := t.reader.ReadRune()
+							if err == io.EOF {
+								return Token{
+									Type:   TokenPlainScalar,
+									Value:  "--",
+									Line:   t.line,
+									Column: t.column - 2,
+								}, nil
+							}
+							if err != nil {
+								t.reader.UnreadRune()
+							} else {
+								if ch == '-' {
+									return Token{Type: TokenDocStart, Value: "---", Line: t.line, Column: t.column}, nil
+								}
+							}
+						}
+					*/
+
+					if ch == ' ' || ch == '\n' {
+						return t.unreadAndReturnDash()
+					}
+					if err := t.reader.UnreadRune(); err != nil {
+						return Token{}, err
+					}
+
+					//t.status = statusBlank
+
+					//var scalar []rune
+					scalar := []rune{'-'}
+
+					return t.collectPlainScalar(scalar)
 				}
 			}
 
@@ -87,7 +172,15 @@ func (t *Tokenizer) NextToken() (Token, error) {
 
 			// skip blanks
 			for {
-				ch, _, err := t.reader.ReadRune()
+				if ch == '\n' {
+					return t.returnNewLine()
+				}
+				if ch != ' ' && ch != '\t' {
+					scalar = append(scalar, ch)
+					break
+				}
+
+				ch, _, err = t.reader.ReadRune()
 				if err == io.EOF {
 					return t.returnEOF()
 				}
@@ -96,44 +189,11 @@ func (t *Tokenizer) NextToken() (Token, error) {
 				}
 
 				t.column++
-				if ch == '\n' {
-					return t.returnNewLine()
-				}
-				if ch != ' ' && ch != '\t' {
-					scalar = append(scalar, ch)
-					break
-				}
 			}
 
 			// collect plain scalar
 
-			for {
-				peek, err := t.reader.Peek(1)
-				if err == io.EOF {
-					break
-				}
-				if err != nil {
-					return Token{}, err
-				}
-
-				if peek[0] == '\n' || peek[0] == '#' {
-					break
-				}
-				ch, _, err := t.reader.ReadRune()
-				if err != nil {
-					return Token{}, err
-				}
-				scalar = append(scalar, ch)
-				t.column++
-			}
-
-			value := string(scalar)
-			return Token{
-				Type:   TokenPlainScalar,
-				Value:  strings.TrimSpace(value),
-				Line:   t.line,
-				Column: t.column - len(value),
-			}, nil
+			return t.collectPlainScalar(scalar)
 
 		default:
 			return Token{}, fmt.Errorf("unexpected token status: %d", t.status)
@@ -151,6 +211,8 @@ const (
 	TokenDash
 	TokenPlainScalar
 	TokenNewLine
+	TokenDocStart // for '---'
+	TokenDocEnd   // for '...'
 )
 
 var tokenTypeName = []string{
@@ -158,6 +220,8 @@ var tokenTypeName = []string{
 	"DASH",
 	"PLAIN-SCALAR",
 	"NEWLINE",
+	"DOC-START",
+	"DOC-END",
 }
 
 // TokenEqual checks two tokens for equality.

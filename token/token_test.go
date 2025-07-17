@@ -68,8 +68,53 @@ var tokenizerTestTable = []tokenizerTest{
 			{Type: TokenDash}, {Type: TokenPlainScalar, Value: "cherry"}, {Type: TokenNewLine},
 		},
 	},
+	{"dash-after-dash", "- - value\n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "- value", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 10},
+	}},
+	{"double-dash-scalar-only", "--", []Token{
+		{Type: TokenPlainScalar, Value: "--", Line: 1, Column: 1},
+	}},
+	{"isolated-dash", "-", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+	}},
+	{"dash-followed-by-text", "-a", []Token{
+		{Type: TokenPlainScalar, Value: "-a", Line: 1, Column: 1},
+	}},
+	{"double-dash-scalar-only-newline", "--\n", []Token{
+		{Type: TokenPlainScalar, Value: "--", Line: 1, Column: 1}, {Type: TokenNewLine},
+	}},
+	{"isolated-dash-newline", "-\n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1}, {Type: TokenNewLine},
+	}},
+	{"dash-followed-by-text-newline", "-a\n", []Token{
+		{Type: TokenPlainScalar, Value: "-a", Line: 1, Column: 1}, {Type: TokenNewLine},
+	}},
+	{"doc-start-marker", "---", []Token{
+		{Type: TokenDocStart, Line: 1, Column: 1},
+	}},
+	{"doc-start-marker-newline", "---\n", []Token{
+		{Type: TokenDocStart, Line: 1, Column: 1},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
+	{"doc-start-with-scalar", "--- hello\n", []Token{
+		{Type: TokenDocStart, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "hello", Line: 1, Column: 5},
+		{Type: TokenNewLine, Line: 1, Column: 10},
+	}},
+	{"false-doc-start-four-dashes", "----", []Token{
+		{Type: TokenPlainScalar, Value: "----", Line: 1, Column: 1},
+	}},
+	{"false-doc-start-indented", "  ---", []Token{
+		{Type: TokenPlainScalar, Value: "---", Line: 1, Column: 3},
+	}},
+	{"false-doc-start-inline", "---value", []Token{
+		{Type: TokenPlainScalar, Value: "---value", Line: 1, Column: 1},
+	}},
 }
 
+// go test -count 1 -run '^TestTokenizer$' ./...
 func TestTokenizer(t *testing.T) {
 	for i, data := range tokenizerTestTable {
 		name := fmt.Sprintf("%02d of %02d: %s", i+1, len(tokenizerTestTable), data.name)
