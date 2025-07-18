@@ -211,6 +211,12 @@ var tokenizerTestTable = []tokenizerTest{
 	{"false-doc-end-indented", "  ...", []Token{
 		{Type: TokenPlainScalar, Value: "...", Line: 1, Column: 3},
 	}},
+	{"false-doc-end-leading-space", " ...", []Token{
+		{Type: TokenPlainScalar, Value: "...", Line: 1, Column: 2},
+	}},
+	{"false-doc-end-tab-indented", "\t...", []Token{
+		{Type: TokenPlainScalar, Value: "\t...", Line: 1, Column: 2},
+	}},
 	{"false-doc-end-inline", "...value", []Token{
 		{Type: TokenPlainScalar, Value: "...value", Line: 1, Column: 1},
 	}},
