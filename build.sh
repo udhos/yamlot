@@ -18,7 +18,7 @@ deadcode ./cmd/*
 
 go env -w CGO_ENABLED=1
 
-go test -race ./...
+go test -race -count 1 ./...
 
 #go test -bench=BenchmarkController ./cmd/secrets
 

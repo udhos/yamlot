@@ -181,6 +181,18 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenPlainScalar, Value: "\t foo\t ", Line: 1, Column: 3},
 		{Type: TokenNewLine, Line: 1, Column: 10},
 	}},
+	{"multiple-newlines-eof", "\n\n\n", []Token{
+		{Type: TokenNewLine, Line: 1, Column: 1},
+		{Type: TokenNewLine, Line: 2, Column: 1},
+		{Type: TokenNewLine, Line: 3, Column: 1},
+	}},
+	{"multiple-newlines-final-scalar", "- hello\n\n\n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "hello", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 8},
+		{Type: TokenNewLine, Line: 2, Column: 1},
+		{Type: TokenNewLine, Line: 3, Column: 1},
+	}},
 }
 
 // go test -count 1 -run '^TestTokenizer$' ./...
