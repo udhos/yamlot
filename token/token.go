@@ -75,10 +75,27 @@ func (t *Tokenizer) returnDocStart() (Token, error) {
 }
 
 func (t *Tokenizer) unreadAndReturnDash() (Token, error) {
-	if err := t.reader.UnreadRune(); err != nil {
+	if err := t.unreadRune(); err != nil {
 		return Token{}, err
 	}
 	return t.returnDash()
+}
+
+func (t *Tokenizer) readRune() (rune, error) {
+	ch, _, err := t.reader.ReadRune()
+	if err != nil {
+		return 0, err
+	}
+	t.column++
+	return ch, nil
+}
+
+func (t *Tokenizer) unreadRune() error {
+	if err := t.reader.UnreadRune(); err != nil {
+		return err
+	}
+	t.column--
+	return nil
 }
 
 func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
@@ -95,12 +112,11 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 		if peek[0] == '\n' || peek[0] == '#' {
 			break
 		}
-		ch, _, err := t.reader.ReadRune()
+		ch, err := t.readRune()
 		if err != nil {
 			return Token{}, err
 		}
 		scalar = append(scalar, ch)
-		t.column++
 	}
 
 	value := string(scalar)
@@ -153,7 +169,7 @@ NEXT_RUNE:
 			return t.returnEOF()
 		}
 
-		ch, _, err := t.reader.ReadRune()
+		ch, err := t.readRune()
 
 		if t.debug {
 			fmt.Printf("%s: Read rune: %d, err: %v\n", statusName[t.status], ch, err)
@@ -165,8 +181,6 @@ NEXT_RUNE:
 		if err != nil {
 			return Token{}, err
 		}
-
-		t.column++
 
 		switch t.status {
 
@@ -213,7 +227,7 @@ NEXT_RUNE:
 				}, nil
 			case '\n':
 				t.status = statusBlank
-				if err := t.reader.UnreadRune(); err != nil {
+				if err := t.unreadRune(); err != nil {
 					return Token{}, err
 				}
 				return Token{
@@ -233,13 +247,13 @@ NEXT_RUNE:
 			switch ch {
 			case ' ':
 				t.status = statusBlank
-				if err := t.reader.UnreadRune(); err != nil {
+				if err := t.unreadRune(); err != nil {
 					return Token{}, err
 				}
 				return t.returnDocStart()
 			case '\n':
 				t.status = statusBlank
-				if err := t.reader.UnreadRune(); err != nil {
+				if err := t.unreadRune(); err != nil {
 					return Token{}, err
 				}
 				return t.returnDocStart()
@@ -260,23 +274,20 @@ NEXT_RUNE:
 					break
 				}
 
-				ch, _, err = t.reader.ReadRune()
+				ch, err = t.readRune()
 				if err == io.EOF {
 					return t.returnEOF()
 				}
 				if err != nil {
 					return Token{}, err
 				}
-
-				t.column++
 			}
 			return t.collectPlainScalar(scalar)
 
 		case statusScalar:
 			t.status = statusBlank
 			if ch == '\n' {
-				t.reader.UnreadRune()
-				t.column--
+				t.unreadRune()
 				return t.collectPlainScalar(nil)
 			}
 			return t.collectPlainScalar([]rune{ch})
