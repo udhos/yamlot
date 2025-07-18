@@ -100,16 +100,6 @@ var tokenizerTestTable = []tokenizerTest{
 	{"isolated-dash-newline", "-\n", []Token{
 		{Type: TokenDash, Line: 1, Column: 1}, {Type: TokenNewLine},
 	}},
-	{"empty-scalar-after-dash", "- \n", []Token{
-		{Type: TokenDash, Line: 1, Column: 1},
-		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 3},
-		{Type: TokenNewLine, Line: 1, Column: 4},
-	}},
-	{"empty-scalar-two-spaces", "-  \n", []Token{
-		{Type: TokenDash, Line: 1, Column: 1},
-		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 4},
-		{Type: TokenNewLine, Line: 1, Column: 4},
-	}},
 	{"dash-followed-by-text-newline", "-a\n", []Token{
 		{Type: TokenPlainScalar, Value: "-a", Line: 1, Column: 1}, {Type: TokenNewLine},
 	}},
@@ -143,6 +133,16 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenDash, Line: 1, Column: 1},
 		{Type: TokenPlainScalar, Value: "\tvalue", Line: 1, Column: 3},
 		{Type: TokenNewLine, Line: 1, Column: 9},
+	}},
+	{"empty-scalar-two-spaces", "-  \n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 4},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
+	{"empty-scalar-after-dash", "- \n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 4},
 	}},
 }
 
@@ -187,5 +187,5 @@ func formatTokens(list []Token) string {
 	for _, t := range list {
 		result = append(result, t.String())
 	}
-	return strings.Join(result, "")
+	return strings.Join(result, ",")
 }

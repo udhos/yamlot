@@ -26,6 +26,7 @@ const (
 	statusTwoDashes
 	statusThreeDashes
 	statusAfterDash
+	statusScalar
 )
 
 var statusName = []string{
@@ -34,6 +35,7 @@ var statusName = []string{
 	"StatusTwoDashes",
 	"StatusThreeDashes",
 	"StatusAfterDash",
+	"StatusScalar",
 }
 
 // NewTokenizer creates tokenizer.
@@ -60,7 +62,6 @@ func (t *Tokenizer) returnNewLine() (Token, error) {
 
 func (t *Tokenizer) returnDash() (Token, error) {
 	tk := Token{Type: TokenDash, Value: "-", Line: t.line, Column: t.column}
-	t.status = statusAfterDash
 	return tk, nil
 }
 
@@ -185,7 +186,7 @@ NEXT_RUNE:
 		case statusOneDash:
 			switch ch {
 			case ' ':
-				t.status = statusAfterDash
+				t.status = statusScalar
 				return t.returnDash()
 			case '\t':
 				t.status = statusAfterDash
@@ -271,6 +272,15 @@ NEXT_RUNE:
 			}
 			return t.collectPlainScalar(scalar)
 
+		case statusScalar:
+			t.status = statusBlank
+			if ch == '\n' {
+				t.reader.UnreadRune()
+				t.column--
+				return t.collectPlainScalar(nil)
+			}
+			return t.collectPlainScalar([]rune{ch})
+
 		default:
 			return Token{}, fmt.Errorf("unexpected token status: %d", t.status)
 		}
@@ -324,5 +334,5 @@ func (t *Token) String() string {
 	if t.Type == TokenPlainScalar {
 		return fmt.Sprintf("%s(%s)", tokenTypeName[t.Type], t.Value)
 	}
-	return fmt.Sprintf("%s()", tokenTypeName[t.Type])
+	return fmt.Sprintf("%s", tokenTypeName[t.Type])
 }
