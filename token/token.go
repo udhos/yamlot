@@ -9,12 +9,13 @@ import (
 
 // Tokenizer tokenizes yaml tokens.
 type Tokenizer struct {
-	reader *bufio.Reader
-	line   int
-	column int
-	status tokenStatus
-	eof    bool // force EOF
-	debug  bool
+	reader                *bufio.Reader
+	line                  int
+	column                int
+	status                tokenStatus
+	debug                 bool
+	indentationLevelStack []int
+	tokenBuffer           []Token
 }
 
 type tokenStatus int
@@ -46,12 +47,38 @@ var statusName = []string{
 // NewTokenizer creates tokenizer.
 func NewTokenizer(input io.Reader, debug bool) *Tokenizer {
 	return &Tokenizer{
-		reader: bufio.NewReader(input),
-		line:   1,
-		column: 0,
-		status: statusBlank,
-		debug:  debug,
+		reader:                bufio.NewReader(input),
+		line:                  1,
+		column:                0,
+		status:                statusBlank,
+		debug:                 debug,
+		indentationLevelStack: []int{0}, // start with level 0
 	}
+}
+
+func (t *Tokenizer) indentPush(level int) {
+	t.indentationLevelStack = append(t.indentationLevelStack, level)
+}
+
+func (t *Tokenizer) indentPop() int {
+	if len(t.indentationLevelStack) <= 1 {
+		panic("cannot pop indentation level")
+	}
+	level := t.indentationLevelStack[len(t.indentationLevelStack)-1]
+	t.indentationLevelStack = t.indentationLevelStack[:len(t.indentationLevelStack)-1]
+	return level
+}
+
+func (t *Tokenizer) tokenBufferPush(token Token) {
+	t.tokenBuffer = append(t.tokenBuffer, token)
+}
+
+func (t *Tokenizer) tokenBufferShift() Token {
+	// FIXME TODO XXX shifting slice is innefficient for FIFO, we should container/list
+	// FIXME TODO XXX for now we will crash if tokenBuffer is empty
+	var tk Token
+	tk, t.tokenBuffer = t.tokenBuffer[0], t.tokenBuffer[1:]
+	return tk
 }
 
 func (t *Tokenizer) returnError(err error) (Token, error) {
@@ -99,8 +126,14 @@ func (t *Tokenizer) unreadAndReturnDash() (Token, error) {
 	return t.returnDash()
 }
 
-func (t *Tokenizer) readRune() (rune, error) {
+func (t *Tokenizer) readRune(caller string) (rune, error) {
 	ch, _, err := t.reader.ReadRune()
+
+	if t.debug {
+		fmt.Printf("%s: %s: readRune: %d, err: %v\n",
+			caller, statusName[t.status], ch, err)
+	}
+
 	if err != nil {
 		return 0, err
 	}
@@ -118,6 +151,8 @@ func (t *Tokenizer) unreadRune() error {
 
 func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 
+	const me = "collectPlainScalar"
+
 	for {
 		peek, err := t.reader.Peek(1)
 		if err == io.EOF {
@@ -130,7 +165,7 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 		if peek[0] == '\n' || peek[0] == '#' {
 			break
 		}
-		ch, err := t.readRune()
+		ch, err := t.readRune(me)
 		if err != nil {
 			return t.returnError(err)
 		}
@@ -147,69 +182,81 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 	}, nil
 }
 
-func (t *Tokenizer) perStateEOF() (Token, error) {
+func (t *Tokenizer) pushPerStateEOF() {
 
 	switch t.status {
 	case statusOneDash:
-		t.eof = true // force EOF for next call, although we are not returning EOF now
-		return Token{
+		t.tokenBufferPush(Token{
 			Type:   TokenDash,
 			Value:  "-",
 			Line:   t.line,
 			Column: t.column - 1,
-		}, nil
+		})
 	case statusTwoDashes:
-		t.eof = true // force EOF for next call, although we are not returning EOF now
-		return Token{
+		t.tokenBufferPush(Token{
 			Type:   TokenPlainScalar,
 			Value:  "--",
 			Line:   t.line,
 			Column: t.column - 2,
-		}, nil
+		})
 	case statusThreeDashes:
-		t.eof = true // force EOF for next call, although we are not returning EOF now
-		return t.returnDocStart()
+		t.tokenBufferPush(Token{
+			Type:   TokenDocStart,
+			Value:  "---",
+			Line:   t.line,
+			Column: t.column - 3,
+		})
 	case statusOneDot:
-		t.eof = true // force EOF for next call, although we are not returning EOF now
-		return Token{
+		t.tokenBufferPush(Token{
 			Type:   TokenPlainScalar,
 			Value:  ".",
 			Line:   t.line,
 			Column: t.column - 1,
-		}, nil
+		})
 	case statusTwoDots:
-		t.eof = true // force EOF for next call, although we are not returning EOF now
-		return Token{
+		t.tokenBufferPush(Token{
 			Type:   TokenPlainScalar,
 			Value:  "..",
 			Line:   t.line,
 			Column: t.column - 2,
-		}, nil
+		})
 	case statusThreeDots:
-		t.eof = true // force EOF for next call, although we are not returning EOF now
-		return t.returnDocEnd()
+		t.tokenBufferPush(Token{
+			Type:   TokenDocEnd,
+			Value:  "...",
+			Line:   t.line,
+			Column: t.column - 3,
+		})
 	}
 
-	return t.returnEOF()
+	for len(t.indentationLevelStack) > 1 {
+		t.indentPop()
+		t.tokenBufferPush(Token{Type: TokenDedent, Line: t.line, Column: t.column})
+
+	}
+
+	t.tokenBufferPush(Token{Type: TokenEOF, Line: t.line, Column: t.column})
 }
 
 // NextToken gets next token.
 func (t *Tokenizer) NextToken() (Token, error) {
+	const me = "NextToken"
 NEXT_RUNE:
 	for {
-		if t.eof {
-			// force EOF
-			return t.returnEOF()
+		if len(t.tokenBuffer) > 0 {
+			// first return buffered token
+			tk := t.tokenBufferShift()
+			if tk.Type == TokenEOF {
+				return tk, io.EOF
+			}
+			return tk, nil
 		}
 
-		ch, err := t.readRune()
-
-		if t.debug {
-			fmt.Printf("%s: Read rune: %d, err: %v\n", statusName[t.status], ch, err)
-		}
+		ch, err := t.readRune(me)
 
 		if err == io.EOF {
-			return t.perStateEOF()
+			t.pushPerStateEOF()
+			continue
 		}
 		if err != nil {
 			return t.returnError(err)
@@ -366,7 +413,7 @@ NEXT_RUNE:
 					break
 				}
 
-				ch, err = t.readRune()
+				ch, err = t.readRune(fmt.Sprintf("%s: statusAfterDash", me))
 				if err == io.EOF {
 					return t.returnEOF()
 				}
@@ -405,6 +452,8 @@ const (
 	TokenNewLine
 	TokenDocStart // for '---'
 	TokenDocEnd   // for '...'
+	TokenIndent
+	TokenDedent
 )
 
 var tokenTypeName = []string{
@@ -415,6 +464,8 @@ var tokenTypeName = []string{
 	"NEWLINE",
 	"DOC-START",
 	"DOC-END",
+	"INDENT",
+	"DEDENT",
 }
 
 // TokenEqual checks two tokens for equality.
