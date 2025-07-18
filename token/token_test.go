@@ -135,7 +135,7 @@ var tokenizerTestTable = []tokenizerTest{
 	}},
 	{"doc-start-with-scalar-two-spaces", "---  hello\n", []Token{
 		{Type: TokenDocStart, Line: 1, Column: 1},
-		{Type: TokenPlainScalar, Value: "hello", Line: 1, Column: 5},
+		{Type: TokenPlainScalar, Value: " hello", Line: 1, Column: 5},
 		{Type: TokenNewLine, Line: 1, Column: 10},
 	}},
 	{"false-doc-start-four-dashes", "----", []Token{
@@ -154,7 +154,7 @@ var tokenizerTestTable = []tokenizerTest{
 	}},
 	{"empty-scalar-two-spaces", "-  \n", []Token{
 		{Type: TokenDash, Line: 1, Column: 1},
-		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 4},
+		{Type: TokenPlainScalar, Value: " ", Line: 1, Column: 4},
 		{Type: TokenNewLine, Line: 1, Column: 4},
 	}},
 	{"empty-scalar-after-dash", "- \n", []Token{

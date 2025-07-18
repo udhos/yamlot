@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"strings"
 )
 
 // Tokenizer tokenizes yaml tokens.
@@ -125,20 +124,12 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 
 	value := string(scalar)
 
-	if trim := trimSpace(value); trim == "" {
-		value = ""
-	}
-
 	return Token{
 		Type:   TokenPlainScalar,
 		Value:  value,
 		Line:   t.line,
 		Column: t.column - len(value),
 	}, nil
-}
-
-func trimSpace(s string) string {
-	return strings.TrimFunc(s, func(r rune) bool { return r == ' ' })
 }
 
 func (t *Tokenizer) perStateEOF() (Token, error) {
@@ -256,7 +247,7 @@ NEXT_RUNE:
 		case statusThreeDashes:
 			switch ch {
 			case ' ':
-				t.status = statusBlank
+				t.status = statusScalar
 				return t.returnDocStart()
 			case '\n':
 				t.status = statusBlank
