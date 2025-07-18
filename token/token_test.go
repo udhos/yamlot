@@ -30,7 +30,7 @@ func expectEOF(t *testing.T, tokenizer *Tokenizer) {
 
 type errReader struct{}
 
-func (r *errReader) Read(p []byte) (n int, err error) {
+func (r *errReader) Read(_ []byte) (n int, err error) {
 	return 0, fmt.Errorf("read error")
 }
 
@@ -170,6 +170,16 @@ var tokenizerTestTable = []tokenizerTest{
 	{"plain-scalar-with-spaces-no-newline", "-  hello world  ", []Token{
 		{Type: TokenDash, Line: 1, Column: 1},
 		{Type: TokenPlainScalar, Value: " hello world  ", Line: 1, Column: 3},
+	}},
+	{"tab-only-scalar", "-\t\t\n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "\t\t", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
+	{"scalar-tabs-and-spaces", "- \t foo\t \n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "\t foo\t ", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 10},
 	}},
 }
 
