@@ -21,6 +21,9 @@ type tokenStatus int
 
 const (
 	statusBlank tokenStatus = iota
+	statusOneDot
+	statusTwoDots
+	statusThreeDots
 	statusOneDash
 	statusTwoDashes
 	statusThreeDashes
@@ -30,6 +33,9 @@ const (
 
 var statusName = []string{
 	"StatusBlank",
+	"StatusOneDot",
+	"StatusTwoDots",
+	"StatusThreeDots",
 	"StatusOneDash",
 	"StatusTwoDashes",
 	"StatusThreeDashes",
@@ -72,6 +78,15 @@ func (t *Tokenizer) returnDocStart() (Token, error) {
 	return Token{
 		Type:   TokenDocStart,
 		Value:  "---",
+		Line:   t.line,
+		Column: t.column - 3,
+	}, nil
+}
+
+func (t *Tokenizer) returnDocEnd() (Token, error) {
+	return Token{
+		Type:   TokenDocEnd,
+		Value:  "...",
 		Line:   t.line,
 		Column: t.column - 3,
 	}, nil
@@ -154,6 +169,25 @@ func (t *Tokenizer) perStateEOF() (Token, error) {
 	case statusThreeDashes:
 		t.eof = true // force EOF for next call, although we are not returning EOF now
 		return t.returnDocStart()
+	case statusOneDot:
+		t.eof = true // force EOF for next call, although we are not returning EOF now
+		return Token{
+			Type:   TokenPlainScalar,
+			Value:  ".",
+			Line:   t.line,
+			Column: t.column - 1,
+		}, nil
+	case statusTwoDots:
+		t.eof = true // force EOF for next call, although we are not returning EOF now
+		return Token{
+			Type:   TokenPlainScalar,
+			Value:  "..",
+			Line:   t.line,
+			Column: t.column - 2,
+		}, nil
+	case statusThreeDots:
+		t.eof = true // force EOF for next call, although we are not returning EOF now
+		return t.returnDocEnd()
 	}
 
 	return t.returnEOF()
@@ -195,8 +229,68 @@ NEXT_RUNE:
 					t.status = statusOneDash
 					continue NEXT_RUNE
 				}
+			case '.':
+				if t.column == 1 {
+					t.status = statusOneDot
+					continue NEXT_RUNE
+				}
 			}
 			return t.collectPlainScalar([]rune{ch})
+
+		case statusOneDot:
+			switch ch {
+			case '.':
+				t.status = statusTwoDots
+				continue NEXT_RUNE
+			case '\n':
+				t.status = statusBlank
+				if err := t.unreadRune(); err != nil {
+					return t.returnError(err)
+				}
+				return Token{
+					Type:   TokenPlainScalar,
+					Value:  ".",
+					Line:   t.line,
+					Column: t.column - 1,
+				}, nil
+			}
+			t.status = statusScalar
+			return t.collectPlainScalar([]rune{'.', ch})
+
+		case statusTwoDots:
+			switch ch {
+			case '.':
+				t.status = statusThreeDots
+				continue NEXT_RUNE
+			case '\n':
+				t.status = statusBlank
+				if err := t.unreadRune(); err != nil {
+					return t.returnError(err)
+				}
+				return Token{
+					Type:   TokenPlainScalar,
+					Value:  "..",
+					Line:   t.line,
+					Column: t.column - 2,
+				}, nil
+			}
+			t.status = statusScalar
+			return t.collectPlainScalar([]rune{'.', '.', ch})
+
+		case statusThreeDots:
+			switch ch {
+			case ' ':
+				t.status = statusScalar
+				return t.returnDocEnd()
+			case '\n':
+				t.status = statusBlank
+				if err := t.unreadRune(); err != nil {
+					return t.returnError(err)
+				}
+				return t.returnDocEnd()
+			}
+			t.status = statusScalar
+			return t.collectPlainScalar([]rune{'.', '.', '.', ch})
 
 		case statusOneDash:
 			switch ch {

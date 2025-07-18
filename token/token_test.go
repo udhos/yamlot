@@ -193,15 +193,53 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenNewLine, Line: 2, Column: 1},
 		{Type: TokenNewLine, Line: 3, Column: 1},
 	}},
+	{"doc-end-marker", "...", []Token{
+		{Type: TokenDocEnd, Line: 1, Column: 1},
+	}},
+	{"doc-end-marker-newline", "...\n", []Token{
+		{Type: TokenDocEnd, Line: 1, Column: 1},
+		{Type: TokenNewLine, Line: 1, Column: 4},
+	}},
+	{"doc-end-with-scalar", "... goodbye\n", []Token{
+		{Type: TokenDocEnd, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: "goodbye", Line: 1, Column: 5},
+		{Type: TokenNewLine, Line: 1, Column: 12},
+	}},
+	{"false-doc-end-four-dots", "....", []Token{
+		{Type: TokenPlainScalar, Value: "....", Line: 1, Column: 1},
+	}},
+	{"false-doc-end-indented", "  ...", []Token{
+		{Type: TokenPlainScalar, Value: "...", Line: 1, Column: 3},
+	}},
+	{"false-doc-end-inline", "...value", []Token{
+		{Type: TokenPlainScalar, Value: "...value", Line: 1, Column: 1},
+	}},
+	{"false-doc-end-two-dots", "..", []Token{
+		{Type: TokenPlainScalar, Value: "..", Line: 1, Column: 1},
+	}},
+	{"false-doc-end-one-dot", ".", []Token{
+		{Type: TokenPlainScalar, Value: ".", Line: 1, Column: 1},
+	}},
+	{"false-doc-end-two-dots-newline", "..\n", []Token{
+		{Type: TokenPlainScalar, Value: "..", Line: 1, Column: 1},
+		{Type: TokenNewLine, Line: 1, Column: 3},
+	}},
+	{"false-doc-end-one-dot-newline", ".\n", []Token{
+		{Type: TokenPlainScalar, Value: ".", Line: 1, Column: 1},
+		{Type: TokenNewLine, Line: 1, Column: 2},
+	}},
 }
 
 // go test -count 1 -run '^TestTokenizer$' ./...
 func TestTokenizer(t *testing.T) {
+
+	debug := isDebugEnabled()
+
 	for i, data := range tokenizerTestTable {
 		name := fmt.Sprintf("%02d of %02d: %s", i+1, len(tokenizerTestTable), data.name)
 
 		t.Run(name, func(t *testing.T) {
-			tokenizer := NewTokenizer(strings.NewReader(data.input), isDebugEnabled())
+			tokenizer := NewTokenizer(strings.NewReader(data.input), debug)
 			var tokens []Token
 			for {
 				tk, err := tokenizer.NextToken()
@@ -213,13 +251,6 @@ func TestTokenizer(t *testing.T) {
 					return
 				}
 				tokens = append(tokens, tk)
-			}
-
-			if len(data.expected) != len(tokens) {
-				t.Errorf("wrong length: expected=%d got=%d\nexpected:%v\n     got:%v",
-					len(data.expected), len(tokens),
-					formatTokens(data.expected), formatTokens(tokens))
-				return
 			}
 
 			if !slices.EqualFunc(data.expected, tokens, TokenEqual) {
