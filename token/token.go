@@ -49,6 +49,10 @@ func NewTokenizer(input io.Reader, debug bool) *Tokenizer {
 	}
 }
 
+func (t *Tokenizer) returnError(err error) (Token, error) {
+	return Token{Type: TokenError, Line: t.line, Column: t.column}, err
+}
+
 func (t *Tokenizer) returnEOF() (Token, error) {
 	return Token{Type: TokenEOF, Line: t.line, Column: t.column}, io.EOF
 }
@@ -76,7 +80,7 @@ func (t *Tokenizer) returnDocStart() (Token, error) {
 
 func (t *Tokenizer) unreadAndReturnDash() (Token, error) {
 	if err := t.unreadRune(); err != nil {
-		return Token{}, err
+		return t.returnError(err)
 	}
 	return t.returnDash()
 }
@@ -106,7 +110,7 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 			break
 		}
 		if err != nil {
-			return Token{}, err
+			return t.returnError(err)
 		}
 
 		if peek[0] == '\n' || peek[0] == '#' {
@@ -114,7 +118,7 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 		}
 		ch, err := t.readRune()
 		if err != nil {
-			return Token{}, err
+			return t.returnError(err)
 		}
 		scalar = append(scalar, ch)
 	}
@@ -179,7 +183,7 @@ NEXT_RUNE:
 			return t.perStateEOF()
 		}
 		if err != nil {
-			return Token{}, err
+			return t.returnError(err)
 		}
 
 		switch t.status {
@@ -228,7 +232,7 @@ NEXT_RUNE:
 			case '\n':
 				t.status = statusBlank
 				if err := t.unreadRune(); err != nil {
-					return Token{}, err
+					return t.returnError(err)
 				}
 				return Token{
 					Type:   TokenPlainScalar,
@@ -248,13 +252,13 @@ NEXT_RUNE:
 			case ' ':
 				t.status = statusBlank
 				if err := t.unreadRune(); err != nil {
-					return Token{}, err
+					return t.returnError(err)
 				}
 				return t.returnDocStart()
 			case '\n':
 				t.status = statusBlank
 				if err := t.unreadRune(); err != nil {
-					return Token{}, err
+					return t.returnError(err)
 				}
 				return t.returnDocStart()
 			}
@@ -279,7 +283,7 @@ NEXT_RUNE:
 					return t.returnEOF()
 				}
 				if err != nil {
-					return Token{}, err
+					return t.returnError(err)
 				}
 			}
 			return t.collectPlainScalar(scalar)
@@ -287,13 +291,15 @@ NEXT_RUNE:
 		case statusScalar:
 			t.status = statusBlank
 			if ch == '\n' {
-				t.unreadRune()
+				if err := t.unreadRune(); err != nil {
+					return t.returnError(err)
+				}
 				return t.collectPlainScalar(nil)
 			}
 			return t.collectPlainScalar([]rune{ch})
 
 		default:
-			return Token{}, fmt.Errorf("unexpected token status: %d", t.status)
+			return t.returnError(fmt.Errorf("unexpected token status: %d", t.status))
 		}
 
 	}
@@ -305,6 +311,7 @@ type TokenType int
 // Token types.
 const (
 	TokenEOF TokenType = iota
+	TokenError
 	TokenDash
 	TokenPlainScalar
 	TokenNewLine
@@ -314,6 +321,7 @@ const (
 
 var tokenTypeName = []string{
 	"EOF",
+	"ERROR",
 	"DASH",
 	"PLAIN-SCALAR",
 	"NEWLINE",

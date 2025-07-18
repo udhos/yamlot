@@ -28,6 +28,24 @@ func expectEOF(t *testing.T, tokenizer *Tokenizer) {
 	}
 }
 
+type errReader struct{}
+
+func (r *errReader) Read(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("read error")
+}
+
+func TestTokenError(t *testing.T) {
+	rd := &errReader{}
+	tokenizer := NewTokenizer(rd, isDebugEnabled())
+	tk, err := tokenizer.NextToken()
+	if err == nil {
+		t.Error("expecting error, got nil")
+	}
+	if tk.Type != TokenError {
+		t.Errorf("expecting error token, got: %v", tk)
+	}
+}
+
 func TestTokenizerLines(t *testing.T) {
 	tokenizer := NewTokenizer(strings.NewReader("\n\n"), isDebugEnabled())
 	{
