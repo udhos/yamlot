@@ -125,9 +125,13 @@ func (t *Tokenizer) collectPlainScalar(scalar []rune) (Token, error) {
 
 	value := string(scalar)
 
+	if trim := trimSpace(value); trim == "" {
+		value = ""
+	}
+
 	return Token{
 		Type:   TokenPlainScalar,
-		Value:  trimSpace(value),
+		Value:  value,
 		Line:   t.line,
 		Column: t.column - len(value),
 	}, nil
@@ -190,6 +194,8 @@ NEXT_RUNE:
 
 		case statusBlank:
 			switch ch {
+			case ' ':
+				continue NEXT_RUNE
 			case '\n':
 				return t.returnNewLine()
 			case '-':
@@ -251,9 +257,6 @@ NEXT_RUNE:
 			switch ch {
 			case ' ':
 				t.status = statusBlank
-				if err := t.unreadRune(); err != nil {
-					return t.returnError(err)
-				}
 				return t.returnDocStart()
 			case '\n':
 				t.status = statusBlank

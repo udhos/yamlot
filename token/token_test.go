@@ -162,6 +162,15 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenPlainScalar, Value: "", Line: 1, Column: 3},
 		{Type: TokenNewLine, Line: 1, Column: 4},
 	}},
+	{"plain-scalar-with-spaces", "-  hello world  \n", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: " hello world  ", Line: 1, Column: 3},
+		{Type: TokenNewLine, Line: 1, Column: 17},
+	}},
+	{"plain-scalar-with-spaces-no-newline", "-  hello world  ", []Token{
+		{Type: TokenDash, Line: 1, Column: 1},
+		{Type: TokenPlainScalar, Value: " hello world  ", Line: 1, Column: 3},
+	}},
 }
 
 // go test -count 1 -run '^TestTokenizer$' ./...
