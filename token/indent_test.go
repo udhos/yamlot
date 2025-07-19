@@ -9,8 +9,21 @@ import (
 )
 
 var indentTestTable = []tokenizerTest{
-	{"dash with indent", " -", []Token{
-		{Type: TokenIndent}, {Type: TokenDash}, {Type: TokenDedent}}},
+	{"indented plain scalar", " -a",
+		[]Token{
+			{Type: TokenIndent},
+			{Type: TokenPlainScalar, Value: "-a"},
+			{Type: TokenDedent},
+		},
+	},
+	{"indented dash with plain scalar", " -  a",
+		[]Token{
+			{Type: TokenIndent},
+			{Type: TokenDash},
+			{Type: TokenPlainScalar, Value: "a"},
+			{Type: TokenDedent},
+		},
+	},
 }
 
 // go test -count 1 -run '^TestIndent$' ./...
