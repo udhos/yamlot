@@ -64,13 +64,18 @@ func (t *Tokenizer) indentPop() int {
 	if len(t.indentationLevelStack) <= 1 {
 		panic("cannot pop indentation level")
 	}
-	level := t.indentationLevelStack[len(t.indentationLevelStack)-1]
-	t.indentationLevelStack = t.indentationLevelStack[:len(t.indentationLevelStack)-1]
+	last := len(t.indentationLevelStack) - 1
+	level := t.indentationLevelStack[last]
+	t.indentationLevelStack = t.indentationLevelStack[:last]
 	return level
 }
 
+func (t *Tokenizer) indentTop() int {
+	return t.indentationLevelStack[len(t.indentationLevelStack)-1]
+}
+
 func (t *Tokenizer) checkIndent() {
-	previousIndent := t.indentationLevelStack[len(t.indentationLevelStack)-1]
+	previousIndent := t.indentTop()
 	currentIndent := t.column - 1
 	if currentIndent > previousIndent {
 		// Emit INDENT (Indentation Increased)
@@ -80,14 +85,14 @@ func (t *Tokenizer) checkIndent() {
 	} else if currentIndent < previousIndent {
 		// Emit DEDENT(s) (Indentation Decreased)
 
-		for len(t.indentationLevelStack) > 1 && currentIndent < t.indentationLevelStack[len(t.indentationLevelStack)-1] {
+		for len(t.indentationLevelStack) > 1 && currentIndent < t.indentTop() {
 			t.indentPop()
 			t.tokenBufferPush(Token{Type: TokenDedent, Line: t.line, Column: t.column})
 		}
 
 		// After popping, check for an indentation error.
 		// This occurs if currentIndent doesn't match any level that was on the stack.
-		if currentIndent != t.indentationLevelStack[len(t.indentationLevelStack)-1] {
+		if currentIndent != t.indentTop() {
 			t.tokenBufferPush(Token{
 				Type:   TokenError,
 				Value:  fmt.Sprintf("IndentationError: inconsistent dedent from level %d to %d", previousIndent, currentIndent),
