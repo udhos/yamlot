@@ -69,7 +69,40 @@ func (t *Tokenizer) indentPop() int {
 	return level
 }
 
+func (t *Tokenizer) checkIndent() {
+	previousIndent := t.indentationLevelStack[len(t.indentationLevelStack)-1]
+	currentIndent := t.column - 1
+	if currentIndent > previousIndent {
+		// Emit INDENT (Indentation Increased)
+
+		t.indentPush(currentIndent)
+		t.tokenBufferPush(Token{Type: TokenIndent, Line: t.line, Column: t.column})
+	} else if currentIndent < previousIndent {
+		// Emit DEDENT(s) (Indentation Decreased)
+
+		for len(t.indentationLevelStack) > 1 && currentIndent < t.indentationLevelStack[len(t.indentationLevelStack)-1] {
+			t.indentPop()
+			t.tokenBufferPush(Token{Type: TokenDedent, Line: t.line, Column: t.column})
+		}
+
+		// After popping, check for an indentation error.
+		// This occurs if currentIndent doesn't match any level that was on the stack.
+		if currentIndent != t.indentationLevelStack[len(t.indentationLevelStack)-1] {
+			t.tokenBufferPush(Token{
+				Type:   TokenError,
+				Value:  fmt.Sprintf("IndentationError: inconsistent dedent from level %d to %d", previousIndent, currentIndent),
+				Line:   t.line,
+				Column: t.column,
+			})
+		}
+	}
+}
+
 func (t *Tokenizer) tokenBufferPush(token Token) {
+	if t.debug {
+		fmt.Printf("tokenBufferPush: %s at line %d, column %d\n",
+			token.String(), token.Line, token.Column)
+	}
 	t.tokenBuffer = append(t.tokenBuffer, token)
 }
 
@@ -282,7 +315,12 @@ NEXT_RUNE:
 					continue NEXT_RUNE
 				}
 			}
-			return t.collectPlainScalar([]rune{ch})
+
+			t.checkIndent()
+
+			tk, _ := t.collectPlainScalar([]rune{ch})
+			t.tokenBufferPush(tk)
+			continue
 
 		case statusOneDot:
 			switch ch {

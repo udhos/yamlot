@@ -142,7 +142,9 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenPlainScalar, Value: "----", Line: 1, Column: 1},
 	}},
 	{"false-doc-start-indented", "  ---", []Token{
+		{Type: TokenIndent, Line: 1, Column: 3},
 		{Type: TokenPlainScalar, Value: "---", Line: 1, Column: 3},
+		{Type: TokenDedent, Line: 1, Column: 6},
 	}},
 	{"false-doc-start-inline", "---value", []Token{
 		{Type: TokenPlainScalar, Value: "---value", Line: 1, Column: 1},
@@ -209,10 +211,14 @@ var tokenizerTestTable = []tokenizerTest{
 		{Type: TokenPlainScalar, Value: "....", Line: 1, Column: 1},
 	}},
 	{"false-doc-end-indented", "  ...", []Token{
+		{Type: TokenIndent, Line: 1, Column: 3},
 		{Type: TokenPlainScalar, Value: "...", Line: 1, Column: 3},
+		{Type: TokenDedent, Line: 1, Column: 6},
 	}},
 	{"false-doc-end-leading-space", " ...", []Token{
+		{Type: TokenIndent, Line: 1, Column: 2},
 		{Type: TokenPlainScalar, Value: "...", Line: 1, Column: 2},
+		{Type: TokenDedent, Line: 1, Column: 5},
 	}},
 	{"false-doc-end-tab-indented", "\t...", []Token{
 		{Type: TokenPlainScalar, Value: "\t...", Line: 1, Column: 2},
